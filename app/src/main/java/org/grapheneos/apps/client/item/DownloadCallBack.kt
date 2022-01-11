@@ -12,7 +12,7 @@ sealed class DownloadCallBack(
 
     companion object {
         fun DownloadCallBack.toUiMsg(): String {
-            return if (isSuccessFull) genericMsg else genericMsg + error?.localizedMessage
+            return if (isSuccessFull) genericMsg else genericMsg + "\n" + error?.localizedMessage
         }
     }
 
