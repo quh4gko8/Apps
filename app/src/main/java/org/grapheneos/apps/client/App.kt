@@ -404,6 +404,7 @@ class App : Application() {
     }
 
     fun handleOnClick(
+        forced: Boolean = false,
         pkgName: String,
         callback: (result: String) -> Unit
     ) {
@@ -427,39 +428,66 @@ class App : Application() {
         }
 
         CoroutineScope(scopeApkDownload).launch(Dispatchers.IO) {
-            when (status) {
-                is InstallStatus.Installable -> {
+            when (forced) {
+                true -> {
+                    callback.invoke("Forced (re)installing app(s)")
                     downloadPackages(variant) { error -> callback.invoke(error.genericMsg) }
                 }
-                is InstallStatus.Installed -> {
-                    callback.invoke("${getString(R.string.uninstalling)} $pkgName")
-                    pmHelper().uninstall(pkgName)
-                }
-                is InstallStatus.Installing -> {
-                    callback.invoke(getString(R.string.installationInProgress))
-                }
-                is InstallStatus.Uninstalling -> {
-                    callback.invoke(getString(R.string.uninstallationInProgress))
-                }
-                is InstallStatus.Updated -> {
-                    callback.invoke(getString(R.string.alreadyUpToDate))
-                    pmHelper().uninstall(pkgName)
-                }
-                is InstallStatus.Updatable -> {
-                    callback.invoke("${getString(R.string.updating)} $pkgName")
-                    downloadPackages(variant)
-                    { error -> callback.invoke(error.toUiMsg()) }
-                }
-                is InstallStatus.ReinstallRequired -> {
-                    downloadPackages(variant)
-                    { error -> callback.invoke(error.toUiMsg()) }
-                }
-                is InstallStatus.Failed -> {
-                    callback.invoke(getString(R.string.reinstalling))
-                    downloadPackages(variant)
-                    { error -> callback.invoke(error.toUiMsg()) }
+                else -> {
+                    when (status) {
+                        is InstallStatus.Installable -> {
+                            downloadPackages(variant) { error -> callback.invoke(error.genericMsg) }
+                        }
+                        is InstallStatus.Installed -> {
+                            callback.invoke("${getString(R.string.uninstalling)} $pkgName")
+                            pmHelper().uninstall(pkgName)
+                        }
+                        is InstallStatus.Installing -> {
+                            callback.invoke(getString(R.string.installationInProgress))
+                        }
+                        is InstallStatus.Uninstalling -> {
+                            callback.invoke(getString(R.string.uninstallationInProgress))
+                        }
+                        is InstallStatus.Updated -> {
+                            callback.invoke(getString(R.string.alreadyUpToDate))
+                            pmHelper().uninstall(pkgName)
+                        }
+                        is InstallStatus.Updatable -> {
+                            callback.invoke("${getString(R.string.updating)} $pkgName")
+                            downloadPackages(variant)
+                            { error -> callback.invoke(error.toUiMsg()) }
+                        }
+                        is InstallStatus.ReinstallRequired -> {
+                            downloadPackages(variant)
+                            { error -> callback.invoke(error.toUiMsg()) }
+                        }
+                        is InstallStatus.Failed -> {
+                            callback.invoke(getString(R.string.reinstalling))
+                            downloadPackages(variant)
+                            { error -> callback.invoke(error.toUiMsg()) }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    fun updateAllUpdatableApps(callback: (result: String) -> Unit) {
+        packagesInfo.forEach { info ->
+            val installStatus = info.value.installStatus
+            val variant = info.value.selectedVariant
+
+            if (installStatus is InstallStatus.Updatable) {
+                handleOnClick(pkgName = variant.pkgName, callback = callback)
+            }
+        }
+    }
+
+    fun forceInstallGoogleApps(callback: (result: String) -> Unit) {
+        val googleApps =
+            listOf("com.google.android.gsf", "com.google.android.gms", "com.android.vending")
+        googleApps.forEach { pkgName ->
+            handleOnClick(forced = true, pkgName = pkgName, callback = callback)
         }
     }
 
